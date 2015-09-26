@@ -84,14 +84,19 @@ step.size = function(A,B,mem.prev, x.cur, x.prev, y, A.grad, B.grad){
 }
 
 optimize.lin = function(A,B, mem.current, mem.prev, x.current, x.prev, y){
-    iter = 1:10
-    errors = c()
-    new.responses = list()
+    iter = 1:13
+    error.history = c()
+    response.history = list()
+    A.history = list()
+    B.history = list()
+    A.grad.history = list()
+    B.grad.history = list()
     for( i in iter ){
         grads = gradients(A,B, mem.current, mem.prev, x.current, x.prev, y)
         A.grad = grads[[1]]
         B.grad = grads[[2]]
         alpha = step.size(A,B,mem.prev, x.current, x.prev, y, A.grad, B.grad)
+        #alpha = 0.01/i#0.5^(i+5)
         A = A + alpha*A.grad
         B = B + alpha*B.grad
         new.response  = eval.lin.mem.prev(A,
@@ -99,8 +104,15 @@ optimize.lin = function(A,B, mem.current, mem.prev, x.current, x.prev, y){
                         mem.prev, 
                         x.current, x.prev)
         new.error = sum((new.response - y)^2)
-        errors = c(errors, new.error)
-        new.responses = cbind(new.responses, new.response)
+        error.history = c(error.history, new.error)
+        response.history = cbind(response.history, new.response)
+        A.history = cbind(A.history, A)
+        B.history = cbind(B.history,B)
+        A.grad.history = cbind(A.grad.history, A.grad)
+        B.grad.history = cbind(B.grad.history,B.grad)
     }
-    return(list(errors,new.responses))
+    return(list(A,B,
+        error.history,response.history,
+        A.history,B.history,
+        A.grad.history,B.grad.history))
 }
