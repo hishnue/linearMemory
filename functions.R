@@ -118,7 +118,7 @@ step.size = function(A,B,mem.prev, x.cur, x.prev, y, A.grad, B.grad){
                             mem.prev, 
                             x.cur, x.prev)
         new.error = sum((new.response - y)^2)
-        if(error-new.error >= 0){#alpha*tee){
+        if(error-new.error >= alpha*tee){
             print("last new.error")
             print(new.error)
             print("error diff")
@@ -158,13 +158,14 @@ optimize.lin = function(A,B, xs, ys, tol=0.001){
     B.history = list()
     A.grad.history = list()
     B.grad.history = list()
+    mem.history = list()
     for(i in 2:length(xs)){
         # generate variables
         x.current = xs[[i]]
         x.prev = xs[[i-1]]
         y = ys[[i]]
         mem.prev = mem.current
-        mem.current = B %*% rbind(xs[[1]], mem.prev)
+        mem.current = B %*% rbind(mem.prev, x.prev)
         # do gradients
         grads = gradients(A,B, mem.current, mem.prev, x.current, x.prev, y)
         A.grad = grads[[1]]
@@ -174,7 +175,7 @@ optimize.lin = function(A,B, xs, ys, tol=0.001){
         # update matrices
         A = A + alpha*A.grad
         B = B + alpha*B.grad
-        mem.current = B %*% rbind(xs[[1]], mem.prev)
+        mem.current = B %*% rbind(mem.prev, x.prev)
         # calculate histories
         new.response  = eval.lin.mem.prev(A,
                             B, 
@@ -187,8 +188,10 @@ optimize.lin = function(A,B, xs, ys, tol=0.001){
         B.history = list.append(B.history, B)
         A.grad.history = list.append(A.grad.history, A.grad)
         B.grad.history = list.append(B.grad.history, B.grad)
+        mem.history = list.append(mem.history, mem.current)
         if(new.error <= tol){
             # don't actually want #####
+            # want in line search
             print("tolerance reached")
             break
         }
@@ -196,7 +199,8 @@ optimize.lin = function(A,B, xs, ys, tol=0.001){
     return(list(A,B,
         error.history,response.history,
         A.history,B.history,
-        A.grad.history,B.grad.history))
+        A.grad.history,B.grad.history,
+        "mem" = mem.history))
 }
 
 list.append = function(old.list, new.item){
@@ -210,8 +214,8 @@ list.append = function(old.list, new.item){
 test1 = function(){
     A = matrix(runif(2), 1, 2)
     B = matrix(runif(2), 1, 2)
-    xs = as.list(replicate(50, matrix(1), simplify=FALSE))
-    ys = as.list(replicate(50, matrix(5), simplify=FALSE))
+    xs = as.list(replicate(10, matrix(1), simplify=FALSE))
+    ys = as.list(replicate(10, matrix(5), simplify=FALSE))
     results = optimize.lin(A,B,xs,ys)
     return(results)
 }
