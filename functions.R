@@ -51,36 +51,40 @@ check.optimize.input = function(A,B,xs,ys){
     print("done with checks")
 }
 
-eval.lin.mem = function(A, B, memory, x){
+mk.v = function(mem, x){
+    return(rbind(mem,x))
+}
+
+eval.lin.mem = function(A, B, mem, x){
   "A gives result, B gives memory"
-  v = rbind(memory,x)  
+  v = mk.v(mem,x)  
   result = A %*% v
-  new.memory = B %*% v
-  result  = list(result, new.memory)
+  new.mem = B %*% v
+  result  = list(result, new.mem)
   return(result)
 }
 
-eval.lin.mem.prev = function(A, B, memory.prev, x, x.prev){
+eval.lin.mem.prev = function(A, B, mem.prev, x, x.prev){
   "A gives result, B gives memory"
-  v.prev = rbind(memory.prev, x.prev)
-  memory = B %*% v.prev
-  v = rbind(memory,x)  
+  v.prev = mk.v(mem.prev, x.prev)
+  mem = B %*% v.prev
+  v = mk.v(mem, x)  
   result = A %*% v
   return(result)
 }
 
-gradients = function(A,B, mem.current, mem.prev, x.current, x.prev, y){
+gradients = function(A,B, mem.cur, mem.prev, x.cur, x.prev, y){
     # first let's try for grad A
     # Lets do a bunch of asserts about the sizes involved
     # look at output by hand to test
-    results = eval.lin.mem(A,B, mem.current, x.current)
+    results = eval.lin.mem(A,B, mem.cur, x.cur)
     response = results[[1]]
     dy = y - response
     # what goes into the result
-    v.response = rbind(mem.current, x.current)
+    v.response = rbind(mem.cur, x.cur)
     A.grad = dy %*% t(v.response)
     #now we try for grad B
-    dm = (t(A) %*% dy)[1:nrow(mem.current),] #top m rows
+    dm = (t(A) %*% dy)[1:nrow(mem.cur),] #top m rows
     v.mem = rbind(mem.prev, x.prev)
     B.grad = dm %*% t(v.mem)
     result = list(A.grad, B.grad)
@@ -88,12 +92,13 @@ gradients = function(A,B, mem.current, mem.prev, x.current, x.prev, y){
 }
 
 # Do line search to find step size
-step.size = function(A,B,mem.prev, x.cur, x.prev, y, A.grad, B.grad){
+step.size = function(A,B,mem.prev, x.cur, 
+                    x.prev, y, A.grad, B.grad,
+                    tol, max.iter = 100){
    "See
    https://en.wikipedia.org/wiki/Backtracking_line_search 
     for a reference
    "
-   indexes = 1:100
    c = 0.50
    alpha = 0.5
    tau = 0.5
@@ -108,48 +113,41 @@ step.size = function(A,B,mem.prev, x.cur, x.prev, y, A.grad, B.grad){
                     mem.prev, 
                     x.cur, x.prev)
    error = sum((response - y)^2)
-   print("orriginal error")
-   print(error)
-   print("more errors")
-   for(i in indexes){
+   for(i in 1:max.iter){
        new.response  = eval.lin.mem.prev(
                             A + alpha*A.grad,
                             B + alpha*B.grad, 
                             mem.prev, 
                             x.cur, x.prev)
         new.error = sum((new.response - y)^2)
-        if(error-new.error >= alpha*tee){
-            print("last new.error")
-            print(new.error)
-            print("error diff")
-            print(error-new.error)
-            print("alpha tee")
-            print(alpha*tee)
+        if(new.error <= tol){
+            result = alpha
+            break
+        } else if(error-new.error >= alpha*tee){
             result = alpha
             break
         } else {
-            print(new.error)
-            alpha = tau*alpha
-            if(i == max(indexes)){
+            if(i == max.iter){
                 if(error > new.error){
-                    print("OKay lets just try it")
-                    print("error")
-                    print(error)
-                    print("new.error")
-                    print(new.error)
+                    warning("Unable to satisfy Armijo-Goldstein condition,\
+                            but new.error < error, \
+                            so we are returning nonetheless.")
                     result = alpha
                 } else{
-                    stop("Max iteration reached\
-                        and error not improvingterminating.")
+                    stop("Max iteration  reached\
+                        for determining step size\
+                        and error not improving.")
                 }
+            } else{
+                alpha = tau*alpha
             }
         }
    }
    return(result)
 }
 
-
 optimize.lin = function(A,B, xs, ys, tol=0.001){
+    # error might increase because you let it roll once
     check.optimize.input(A,B,xs,ys)
     mem.current = matrix(0, nrow = nrow(B))
     error.history = list()
@@ -165,17 +163,18 @@ optimize.lin = function(A,B, xs, ys, tol=0.001){
         x.prev = xs[[i-1]]
         y = ys[[i]]
         mem.prev = mem.current
-        mem.current = B %*% rbind(mem.prev, x.prev)
+        mem.current = B %*% mk.v(mem.prev, x.prev)
         # do gradients
         grads = gradients(A,B, mem.current, mem.prev, x.current, x.prev, y)
         A.grad = grads[[1]]
         B.grad = grads[[2]]
         # find step size
-        alpha = step.size(A,B,mem.prev, x.current, x.prev, y, A.grad, B.grad)
+        alpha = step.size(A,B,mem.prev, x.current, 
+                            x.prev, y, A.grad, B.grad, tol)
         # update matrices
         A = A + alpha*A.grad
         B = B + alpha*B.grad
-        mem.current = B %*% rbind(mem.prev, x.prev)
+        mem.current = B %*% mk.v(mem.prev, x.prev)
         # calculate histories
         new.response  = eval.lin.mem.prev(A,
                             B, 
