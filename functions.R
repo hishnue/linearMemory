@@ -188,17 +188,21 @@ optimize.lin = function(A,B, xs, ys, tol=0.001){
         A.grad.history = list.append(A.grad.history, A.grad)
         B.grad.history = list.append(B.grad.history, B.grad)
         mem.history = list.append(mem.history, mem.current)
-        if(new.error <= tol){
-            # don't actually want #####
-            # want in line search
-            print("tolerance reached")
-            break
-        }
+#        if(new.error <= tol){
+#            # don't actually want #####
+#            # want in line search
+#            print("tolerance reached")
+#            break
+#        }
     }
-    return(list(A,B,
-        error.history,response.history,
-        A.history,B.history,
-        A.grad.history,B.grad.history,
+    return(list("A" = A,
+                "B" = B,
+                "error" = error.history,
+                "response" = response.history,
+                "As" = A.history,
+                "Bs" = B.history,
+                "A.grad" = A.grad.history,
+                "B.grad" = B.grad.history,
         "mem" = mem.history))
 }
 
@@ -215,6 +219,34 @@ test1 = function(){
     B = matrix(runif(2), 1, 2)
     xs = as.list(replicate(10, matrix(1), simplify=FALSE))
     ys = as.list(replicate(10, matrix(5), simplify=FALSE))
-    results = optimize.lin(A,B,xs,ys)
+    results = optimize.lin(A,B,xs,ys, tol=0.000001)
+    return(results)
+}
+
+test2 = function(){
+    A = matrix(runif(8), 2, 4)
+    B = matrix(runif(8), 2, 4)
+    xs = as.list(replicate(10, matrix(c(1,2), 2, 1), simplify=FALSE))
+    ys = as.list(replicate(10, matrix(c(5,3), 2, 1), simplify=FALSE))
+    results = optimize.lin(A,B,xs,ys, tol=0.000001)
+    return(results)
+}
+
+test3 = function(){
+    iter = 500
+    lager = 2
+    mem.size = 3
+    in.size = 1
+    out.size = 1
+    A = matrix(runif(out.size*(in.size+mem.size)), 
+                out.size, in.size + mem.size)
+    B = matrix(runif(mem.size*(in.size+mem.size)), 
+                mem.size, in.size + mem.size)
+    xs = as.list(replicate(iter, matrix(rbinom(1,1,0.5), 1, 1), simplify=FALSE))
+    ys = as.list(sapply((1+lager):iter, 
+                function(i) xs[[i]], simplify=FALSE))
+    xs = xs[-((iter-lager+1):iter)]
+    print(unlist(ys[-1]))
+    results = optimize.lin(A,B,xs,ys, tol=0.000001)
     return(results)
 }
